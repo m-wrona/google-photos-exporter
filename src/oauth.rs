@@ -3,23 +3,20 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::string::ToString;
 
-use oauth2::basic::{BasicErrorResponse, BasicTokenResponse};
-use oauth2::reqwest::{http_client, Error};
-use oauth2::{
-    basic::BasicClient, revocation::StandardRevocableToken, PkceCodeVerifier, RequestTokenError,
-    TokenResponse,
-};
+use oauth2::basic::BasicTokenResponse;
+use oauth2::reqwest::http_client;
+use oauth2::{basic::BasicClient, PkceCodeVerifier};
 use oauth2::{
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge, RedirectUrl,
     RevocationUrl, Scope, TokenUrl,
 };
 use url::Url;
 
-const AUTH_URL: &'static str = "https://accounts.google.com/o/oauth2/v2/auth";
-const TOKEN_URL: &'static str = "https://oauth2.googleapis.com/token";
-const REVOKE_URL: &'static str = "https://oauth2.googleapis.com/revoke";
-const CALLBACK_URL: &'static str = "127.0.0.1:8080";
-const REDIRECT_URL: &'static str = "http://localhost:8080";
+const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
+const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
+const REVOKE_URL: &str = "https://oauth2.googleapis.com/revoke";
+const CALLBACK_URL: &str = "127.0.0.1:8080";
+const REDIRECT_URL: &str = "http://localhost:8080";
 
 #[derive(Debug)]
 pub struct AuthConfig {
@@ -72,31 +69,28 @@ impl AuthClient {
     pub fn oauth(&self, scope: String) -> Result<BasicTokenResponse, String> {
         let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
 
-        let (authorize_url, csrf_state) = self
+        let (authorize_url, _) = self
             .client
             .authorize_url(CsrfToken::new_random)
             .add_scope(Scope::new(scope))
             .set_pkce_challenge(pkce_code_challenge)
             .url();
 
-        println!(
-            "Open this URL in your browser:\n{}\n",
-            authorize_url.to_string()
-        );
+        println!("Open this URL in your browser:\n{}\n", authorize_url);
 
-        return self.wait_for_callback(pkce_code_verifier, csrf_state);
+        self.wait_for_callback(pkce_code_verifier)
     }
 
     fn wait_for_callback(
         &self,
         pkce_code_verifier: PkceCodeVerifier,
-        csrf_state: CsrfToken,
     ) -> Result<BasicTokenResponse, String> {
         let listener = TcpListener::bind(CALLBACK_URL.to_string()).unwrap();
-        for stream in listener.incoming() {
-            if let Ok(mut stream) = stream {
+        let connection = listener.incoming().next().expect("No new connection");
+
+        return match connection {
+            Ok(mut stream) => {
                 let code;
-                let state;
                 {
                     let mut reader = BufReader::new(&stream);
 
@@ -109,24 +103,13 @@ impl AuthClient {
                     let code_pair = url
                         .query_pairs()
                         .find(|pair| {
-                            let &(ref key, _) = pair;
+                            let (key, _) = pair;
                             key == "code"
                         })
                         .unwrap();
 
                     let (_, value) = code_pair;
                     code = AuthorizationCode::new(value.into_owned());
-
-                    let state_pair = url
-                        .query_pairs()
-                        .find(|pair| {
-                            let &(ref key, _) = pair;
-                            key == "state"
-                        })
-                        .unwrap();
-
-                    let (_, value) = state_pair;
-                    state = CsrfToken::new(value.into_owned());
                 }
 
                 let message = "Auth done. You can close this window now.";
@@ -145,9 +128,10 @@ impl AuthClient {
 
                 println!("Authentication done - success: {}", token_response.is_ok());
 
-                return token_response.map_err(|err| err.to_string());
+                token_response.map_err(|err| err.to_string())
             }
-        }
-        return Err("no callback received".to_string());
+
+            Err(err) => Err(format!("new connection issue: {:?}", err)),
+        };
     }
 }
