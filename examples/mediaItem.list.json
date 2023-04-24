@@ -1,0 +1,25 @@
+{
+  "mediaItems": [
+    {
+      "id": "{id}}",
+      "productUrl": "https://photos.google.com/lr/photo/{some-id}",
+      "baseUrl": "https://lh3.googleusercontent.com/lr/{another-id}",
+      "mimeType": "image/jpeg",
+      "mediaMetadata": {
+        "creationTime": "2021-03-08T16:48:36Z",
+        "width": "3024",
+        "height": "4032",
+        "photo": {
+          "cameraMake": "Apple",
+          "cameraModel": "iPhone 12 Pro",
+          "focalLength": 6,
+          "apertureFNumber": 2,
+          "isoEquivalent": 200,
+          "exposureTime": "0.030303031s"
+        }
+      },
+      "filename": "IMG_4761.HEIC"
+    }
+  ],
+  "nextPageToken": "{token}"
+}

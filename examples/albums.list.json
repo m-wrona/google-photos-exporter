@@ -1,0 +1,13 @@
+{
+  "albums": [
+    {
+      "id": "{id}",
+      "title": "Biuro",
+      "productUrl": "https://photos.google.com/lr/album/{id}",
+      "mediaItemsCount": "113",
+      "coverPhotoBaseUrl": "https://lh3.googleusercontent.com/lr/{cover-id}}",
+      "coverPhotoMediaItemId": "{cover-item-id}"
+    }
+  ],
+  "nextPageToken": "{token}"
+}
