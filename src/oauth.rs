@@ -3,13 +3,14 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::string::ToString;
 
-use oauth2::basic::BasicTokenResponse;
-use oauth2::reqwest::http_client;
 use oauth2::{basic::BasicClient, PkceCodeVerifier};
 use oauth2::{
-    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge, RedirectUrl,
+    AuthorizationCode, AuthUrl, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge, RedirectUrl,
     RevocationUrl, Scope, TokenUrl,
 };
+use oauth2::basic::BasicTokenResponse;
+use oauth2::reqwest::http_client;
+use oauth2::reqwest::async_http_client;
 use url::Url;
 
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -58,15 +59,15 @@ impl AuthClient {
             auth_url,
             Some(token_url),
         )
-        .set_redirect_uri(RedirectUrl::new(REDIRECT_URL.to_string()).expect("Invalid redirect URL"))
-        .set_revocation_uri(
-            RevocationUrl::new(REVOKE_URL.to_string()).expect("Invalid revocation endpoint URL"),
-        );
+            .set_redirect_uri(RedirectUrl::new(REDIRECT_URL.to_string()).expect("Invalid redirect URL"))
+            .set_revocation_uri(
+                RevocationUrl::new(REVOKE_URL.to_string()).expect("Invalid revocation endpoint URL"),
+            );
 
         Self { client }
     }
 
-    pub fn oauth(&self, scope: String) -> Result<BasicTokenResponse, String> {
+    pub async fn oauth(&self, scope: String) -> Result<BasicTokenResponse, String> {
         let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
 
         let (authorize_url, _) = self
@@ -78,10 +79,10 @@ impl AuthClient {
 
         println!("Open this URL in your browser:\n{}\n", authorize_url);
 
-        self.wait_for_callback(pkce_code_verifier)
+        self.wait_for_callback(pkce_code_verifier).await
     }
 
-    fn wait_for_callback(
+    async fn wait_for_callback(
         &self,
         pkce_code_verifier: PkceCodeVerifier,
     ) -> Result<BasicTokenResponse, String> {
@@ -124,7 +125,8 @@ impl AuthClient {
                     .client
                     .exchange_code(code)
                     .set_pkce_verifier(pkce_code_verifier)
-                    .request(http_client);
+                    .request_async(async_http_client)
+                    .await;
 
                 println!("Authentication done - success: {}", token_response.is_ok());
 
